@@ -113,20 +113,21 @@ contract VaultDepositScenariosTest is Test {
     IVault vault5x;  // Moderate (5x leverage) 
     IVault vault20x; // Aggressive (20x leverage)
 
-    Roles public roles;
-
-    constructor() {
+    address[] lps;
+    Roles public roles = Roles({
+    admin : makeAddr("admin"),
+    maintainer: makeAddr("maintainer"),
+    minter : makeAddr("minter"),
         // Setup test roles
-        roles.admin = makeAddr("admin");
-        roles.maintainer = makeAddr("maintainer");
-        roles.minter = makeAddr("minter");
-        roles.dao = makeAddr("dao");
+    dao : makeAddr("dao"),
+    liquidityProviders : lps
+    });
         
-        address[] memory lps = new address[](2);
-        lps[0] = makeAddr("firstLP");
-        lps[1] = makeAddr("secondLP");
-        roles.liquidityProviders = lps;
 
+    function setUp() public {
+        roles.liquidityProviders.push(makeAddr("firstLP"));
+        roles.liquidityProviders.push(makeAddr("secondLP"));
+        lps.push(makeAddr("secondLP"));
         // Deploy all infrastructure contracts
         vm.startPrank(roles.maintainer);
         
@@ -216,7 +217,7 @@ contract VaultDepositScenariosTest is Test {
         
         compoundModule = new CompoundModule();
 
-        lendingStorageManager.setLendingModule(
+        lendingManager.setLendingModule(
             LENDING_ID,
             ILendingStorageManager.LendingInfo(address(compoundModule), "")
         );
@@ -291,6 +292,10 @@ contract VaultDepositScenariosTest is Test {
             finder,
             SynthereumDeployer.Roles(roles.admin, roles.maintainer)
         );
+        finder.changeImplementationAddress(
+            bytes32(bytes("Deployer")),
+            address(deployer)
+        );
         
         // 13. Deploy Pool
         LendingManagerParams memory lendingParams = LendingManagerParams(
@@ -346,6 +351,11 @@ contract VaultDepositScenariosTest is Test {
             1.05 ether
         );
         
+        // Register vaults as LPs in the pool
+        pool.registerLP(address(vault1x));
+        pool.registerLP(address(vault5x));
+        pool.registerLP(address(vault20x));
+        
         vm.stopPrank();
         
         // Fund test accounts with FDUSD
@@ -363,7 +373,11 @@ contract VaultDepositScenariosTest is Test {
         console.log("- Over Collateral Requirement: 5%");
         console.log("");
         
-        // First, provide initial liquidity to the pool
+        // First, register and provide initial liquidity to the pool
+        vm.startPrank(roles.maintainer);
+        pool.registerLP(roles.liquidityProviders[0]);
+        vm.stopPrank();
+        
         vm.startPrank(roles.liquidityProviders[0]);
         collateralToken.approve(address(pool), 5000 ether);
         pool.activateLP(5000 ether, 1.05 ether); // Provide 5000 FDUSD liquidity
@@ -418,7 +432,11 @@ contract VaultDepositScenariosTest is Test {
     function test_CompareVaultLeverageEfficiency() public {
         console.log("=== Vault Leverage Efficiency Comparison ===");
         
-        // Provide initial liquidity
+        // Register and provide initial liquidity
+        vm.startPrank(roles.maintainer);
+        pool.registerLP(roles.liquidityProviders[0]);
+        vm.stopPrank();
+        
         vm.startPrank(roles.liquidityProviders[0]);
         collateralToken.approve(address(pool), 10000 ether);
         pool.activateLP(10000 ether, 1.05 ether);
