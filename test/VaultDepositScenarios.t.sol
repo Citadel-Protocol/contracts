@@ -397,27 +397,42 @@ contract VaultDepositScenariosTest is Test {
         collateralToken.approve(address(vault), depositAmount);
         
         // Get initial state
-        uint256 initialSynthBalance = synthToken.balanceOf(roles.minter);
         uint256 initialCollateralBalance = collateralToken.balanceOf(roles.minter);
         
         // Make deposit
         uint256 lpTokensReceived = vault.deposit(depositAmount, roles.minter);
         
         // Get final state
-        uint256 finalSynthBalance = synthToken.balanceOf(roles.minter);
         uint256 finalCollateralBalance = collateralToken.balanceOf(roles.minter);
-        
-        // Calculate results
-        uint256 synthMinted = finalSynthBalance - initialSynthBalance;
         uint256 collateralSpent = initialCollateralBalance - finalCollateralBalance;
+        
+        // Get vault position info from pool to determine mintable synthetic tokens
+        ISynthereumMultiLpLiquidityPool.LPInfo memory vaultPosition = pool.positionLPInfo(address(vault));
+        uint256 mintableAmount = vaultPosition.capacity;
+        
+        // Calculate Virtual Liquidity using the Jarvis formula:
+        // VL = NetDeposit / (MHR - 1) - Position * Price
+        uint256 mhr = vaultPosition.overCollateralization; // MHR (Minimum Health Ratio)
+        uint256 netDeposit = vaultPosition.actualCollateralAmount;
+        uint256 position = vaultPosition.tokensCollateralized; // Current synthetic tokens
+        
+        // Calculate theoretical VL (simplified - without current position impact)
+        uint256 virtualLiquidityTheoretical = 0;
+        if (mhr > 1e18) {
+            virtualLiquidityTheoretical = (netDeposit * 1e18) / (mhr - 1e18);
+        }
         
         console.log("Deposited: %s FDUSD", _formatAmount(collateralSpent));
         console.log("LP Tokens Received: %s", _formatAmount(lpTokensReceived));
-        console.log("Citadel Euros Mintable: %s cEUR", _formatAmount(synthMinted));
+        console.log("Citadel Euros Mintable: %s cEUR", _formatAmount(mintableAmount));
+        console.log("Vault Overcollateralization: %s.%s%%", mhr / 1e16, (mhr % 1e16) / 1e14);
+        console.log("Net Collateral Deposited: %s FDUSD", _formatAmount(netDeposit));
+        console.log("Tokens Collateralized: %s cEUR", _formatAmount(position));
+        console.log("Virtual Liquidity (Theoretical): %s FDUSD", _formatAmount(virtualLiquidityTheoretical));
         
         // Calculate effective leverage
-        if (synthMinted > 0) {
-            uint256 leverage = (synthMinted * 1e18) / collateralSpent;
+        if (mintableAmount > 0) {
+            uint256 leverage = (mintableAmount * 1e18) / collateralSpent;
             console.log("Effective Leverage: %s.%sx", leverage / 1e18, (leverage % 1e18) / 1e17);
         }
         
@@ -427,6 +442,61 @@ contract VaultDepositScenariosTest is Test {
     
     function _formatAmount(uint256 amount) internal pure returns (string memory) {
         return vm.toString(amount / 1e18);
+    }
+    
+    function test_VirtualLiquidityAnalysis() public {
+        console.log("=== Virtual Liquidity Analysis ===");
+        console.log("Formula: VL = NetDeposit / (MHR - 1) - Position * Price");
+        console.log("");
+        
+        // Register and provide initial liquidity
+        vm.startPrank(roles.maintainer);
+        pool.registerLP(roles.liquidityProviders[0]);
+        vm.stopPrank();
+        
+        vm.startPrank(roles.liquidityProviders[0]);
+        collateralToken.approve(address(pool), 10000 ether);
+        pool.activateLP(10000 ether, 1.05 ether);
+        vm.stopPrank();
+        
+        // Test each vault with 100 FDUSD deposit
+        IVault[3] memory vaults = [vault1x, vault5x, vault20x];
+        string[3] memory names = ["1x Conservative", "5x Moderate", "20x Aggressive"];
+        uint256[3] memory mhrValues = [uint256(2.0 ether), uint256(1.2 ether), uint256(1.05 ether)];
+        
+        for (uint i = 0; i < 3; i++) {
+            console.log("--- %s Vault ---", names[i]);
+            
+            // Make deposit
+            vm.startPrank(roles.minter);
+            collateralToken.approve(address(vaults[i]), DEPOSIT_AMOUNT);
+            vaults[i].deposit(DEPOSIT_AMOUNT, roles.minter);
+            vm.stopPrank();
+            
+            // Get vault position info
+            ISynthereumMultiLpLiquidityPool.LPInfo memory vaultPosition = pool.positionLPInfo(address(vaults[i]));
+            
+            // Calculate Virtual Liquidity components
+            uint256 mhr = mhrValues[i];
+            uint256 netDeposit = vaultPosition.actualCollateralAmount;
+            uint256 position = vaultPosition.tokensCollateralized;
+            
+            // Theoretical VL calculation: NetDeposit / (MHR - 1)
+            uint256 theoreticalVL = (netDeposit * 1e18) / (mhr - 1e18);
+            
+            console.log("MHR (Overcollateralization): %s.%s%%", mhr / 1e16, (mhr % 1e16) / 1e14);
+            console.log("Net Deposit: %s FDUSD", _formatAmount(netDeposit));
+            console.log("Current Position: %s cEUR", _formatAmount(position));
+            console.log("Theoretical VL: %s FDUSD", _formatAmount(theoreticalVL));
+            console.log("Mintable Capacity: %s cEUR", _formatAmount(vaultPosition.capacity));
+            console.log("Utilization: %s.%s%%", vaultPosition.utilization / 1e16, (vaultPosition.utilization % 1e16) / 1e14);
+            console.log("");
+        }
+        
+        console.log("Key Insights:");
+        console.log("- Lower MHR = Higher Virtual Liquidity");
+        console.log("- VL amplifies the pool's capacity to mint synthetic tokens");
+        console.log("- Actual capacity depends on current positions and price");
     }
     
     function test_CompareVaultLeverageEfficiency() public {
@@ -453,11 +523,11 @@ contract VaultDepositScenariosTest is Test {
             vm.startPrank(roles.minter);
             collateralToken.approve(address(vaults[i]), DEPOSIT_AMOUNT);
             
-            uint256 initialSynth = synthToken.balanceOf(roles.minter);
             vaults[i].deposit(DEPOSIT_AMOUNT, roles.minter);
-            uint256 finalSynth = synthToken.balanceOf(roles.minter);
             
-            synthAmounts[i] = finalSynth - initialSynth;
+            // Get vault position info from pool to determine mintable synthetic tokens
+            ISynthereumMultiLpLiquidityPool.LPInfo memory vaultPosition = pool.positionLPInfo(address(vaults[i]));
+            synthAmounts[i] = vaultPosition.capacity;
             leverages[i] = (synthAmounts[i] * 1e18) / DEPOSIT_AMOUNT;
             
             vm.stopPrank();
