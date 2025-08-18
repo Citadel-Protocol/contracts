@@ -5,6 +5,9 @@ out = "out"
 libs = ["lib"]
 optimizer = true
 optimizer_runs = 200
+remappings = [
+    "@pythnetwork/pyth-sdk-solidity/=node_modules/@pythnetwork/pyth-sdk-solidity/"
+]
 fs_permissions = [
     { access = "read-write", path = "./script" },
     { access = "read-write", path = "./script/deployments" },
