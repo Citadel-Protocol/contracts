@@ -7,6 +7,9 @@ out/
 /broadcast/*/31337/
 /broadcast/**/dry-run/
 
+# node_modules dependacies
+node_modules/
+
 # Docs
 docs/
 
