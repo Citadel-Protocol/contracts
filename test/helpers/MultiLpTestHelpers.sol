@@ -6,6 +6,8 @@ import {ILendingStorageManager} from "../../src/lending-module/interfaces/ILendi
 import {ISynthereumFinder} from "../../src/interfaces/IFinder.sol";
 import {ILendingManager} from "../../src/lending-module/interfaces/ILendingManager.sol";
 import {IERC20} from "lib/forge-std/src/interfaces/IERC20.sol";
+import {ICompoundToken} from "../../src/interfaces/ICToken.sol";
+import {SynthereumInterfaces} from "../../src/Constants.sol";
 
 /// @title MultiLpTestHelpers
 /// @notice Helper functions for MultiLpLiquidityPool tests
@@ -77,6 +79,23 @@ library MultiLpTestHelpers {
         }
     }
 
+    /// @notice Updates pool positions and returns accumulated interest
+    /// @param _pool The pool contract address
+    /// @param _finder The SynthereumFinder contract
+    /// @return poolInterest The accumulated pool interest
+    function updatePositions(
+        address _pool,
+        ISynthereumFinder _finder
+    ) internal returns (uint256 poolInterest) {
+        ISynthereumMultiLpLiquidityPool poolContract = ISynthereumMultiLpLiquidityPool(_pool);
+        ILendingManager lendingManager = ILendingManager(
+            _finder.getImplementationAddress(SynthereumInterfaces.LendingManager)
+        );
+        
+        (poolInterest, , , ) = lendingManager.getAccumulatedInterest(_pool);
+        poolContract.updatePositions();
+    }
+
     struct TotalCollateral {
         uint256 usersCollateral;
         uint256 lpsCollateral;
@@ -116,11 +135,11 @@ library MultiLpTestHelpers {
         //We need to get the storage manager and lending manager from the finder
         ILendingStorageManager storageManager = ILendingStorageManager(
             finder.getImplementationAddress(
-                bytes32(bytes("LendingStorageManager"))
+               SynthereumInterfaces.LendingStorageManager
             )
         );
         ILendingManager lendingManager = ILendingManager(
-            finder.getImplementationAddress(bytes32(bytes("LendingManager")))
+            finder.getImplementationAddress(SynthereumInterfaces.LendingManager)
         );
 
         //Then we get the pool data
@@ -181,5 +200,13 @@ library MultiLpTestHelpers {
         for (uint256 j = 0; j < _lps.length; j++) {
             lpsInfo[j] = poolInstance.positionLPInfo(_lps[j]);
         }
+    }
+
+    /// @notice Updates the lending rate for Ovix or Midas modules by calling exchangeRateCurrent on the bearing token
+    /// @param pool The pool contract
+    function updateLendingRate(address pool) internal {
+        // Get lending module name and bearing token address
+        (string memory lendingModule, address bearingTokenAddr) = ISynthereumMultiLpLiquidityPool(pool).lendingProtocolInfo();
+        ICompoundToken(bearingTokenAddr).exchangeRateCurrent();
     }
 }

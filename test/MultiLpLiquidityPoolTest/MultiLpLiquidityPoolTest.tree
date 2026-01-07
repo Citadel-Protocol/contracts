@@ -75,11 +75,11 @@ MultiLpLiquidityPool_Test
    ├── when liquidation
    │  ├── it should allow liquidation of undercollateralized LP
    │  ├── it should liquidate all LP positions
-   //here
    │  ├── given LP is unactive
    │  │  └── it should revert
    │  └── given LP is still collateralized
    │     └── it should revert
+      //here
    ├── when LP profits or loss interests are split
    │  ├── it should split lending interests correctly
    │  ├── it should distribute profits among LPs
