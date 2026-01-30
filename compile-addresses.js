@@ -3,72 +3,61 @@
 const fs = require('fs');
 const path = require('path');
 
-const addressesDir = 'script/deployments/addresses';
-const outputFile = 'deployed_addresses.json';
+// Configuration
+const ADDRESSES_DIR = './script/deployments/addresses';
+const OUTPUT_DIR = './deployments';
+const OUTPUT_FILE = path.join(OUTPUT_DIR, 'mainnet-addresses.json');
 
-const contractNames = [
-    'finder',
-    'deployer', 
-    'priceFeed',
-    'chainlinkPriceFeed',
-    'collateralWhitelist',
-    'identifierWhitelist',
-    'tokenFactory',
-    'lendingStorageManager',
-    'lendingManager',
-    'compoundModule',
-    'poolRegistry',
-    'manager',
-    'trustedForwarder',
-    'factoryVersioning',
-    'poolFactory',
-    'pool',
-    'poolImplementation'
-];
-
-function extractAddressFromFile(filePath) {
-    try {
-        const content = fs.readFileSync(filePath, 'utf8');
-        const match = content.match(/0x[a-fA-F0-9]{40}/);
-        return match ? match[0] : null;
-    } catch (error) {
-        return null;
-    }
+// Ensure output directory exists
+if (!fs.existsSync(OUTPUT_DIR)) {
+    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 }
 
-function compileAddresses() {
-    const deployedAddresses = {};
+// Read all address files and consolidate
+const addresses = {};
+const timestamp = new Date().toISOString();
+
+try {
+    // Read all .txt files in addresses directory
+    const files = fs.readdirSync(ADDRESSES_DIR).filter(file => file.endsWith('.txt'));
     
-    console.log('Compiling deployed addresses...');
-    
-    for (const contractName of contractNames) {
-        const filePath = path.join(addressesDir, `${contractName}.txt`);
-        const address = extractAddressFromFile(filePath);
+    for (const file of files) {
+        const filePath = path.join(ADDRESSES_DIR, file);
+        const content = fs.readFileSync(filePath, 'utf8').trim();
         
-        if (address) {
-            deployedAddresses[contractName] = address;
-            console.log(`✓ ${contractName}: ${address}`);
-        } else {
-            console.log(`✗ ${contractName}: not found or invalid`);
+        // Parse the KEY=VALUE format
+        const [key, value] = content.split('=');
+        if (key && value) {
+            // Convert filename to camelCase key
+            const contractName = file.replace('.txt', '');
+            addresses[contractName] = {
+                address: value,
+                key: key
+            };
         }
     }
     
-    const output = {
-        deployedAddresses,
-        network: 'anvil-fork',
-        timestamp: new Date().toISOString(),
-        compiledAt: Math.floor(Date.now() / 1000)
+    // Create final JSON structure
+    const deploymentData = {
+        network: 'mainnet',
+        chainId: null, // Will be filled by deployment script
+        deployedAt: timestamp,
+        contracts: addresses
     };
     
-    fs.writeFileSync(outputFile, JSON.stringify(output, null, 2));
+    // Write consolidated JSON
+    fs.writeFileSync(OUTPUT_FILE, JSON.stringify(deploymentData, null, 2));
     
-    console.log(`\n📄 Compiled ${Object.keys(deployedAddresses).length} addresses to ${outputFile}`);
+    console.log(`✅ Addresses consolidated to: ${OUTPUT_FILE}`);
+    console.log(`📦 Found ${Object.keys(addresses).length} contracts`);
     
-    return output;
+    // Display summary
+    console.log('\n📋 Contract Summary:');
+    Object.entries(addresses).forEach(([name, data]) => {
+        console.log(`  ${name}: ${data.address}`);
+    });
+    
+} catch (error) {
+    console.error('❌ Error consolidating addresses:', error.message);
+    process.exit(1);
 }
-
-if (require.main === module) {
-    compileAddresses();
-}
-
-module.exports = { compileAddresses };

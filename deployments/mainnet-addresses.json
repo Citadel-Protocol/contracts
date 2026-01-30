@@ -1,0 +1,99 @@
+{
+  "network": "mainnet",
+  "chainId": null,
+  "deployedAt": "2026-01-30T12:59:51.137Z",
+  "contracts": {
+    "chainlinkPriceFeed": {
+      "address": "0xAF6A48dE677C1F7c3A974AB1126278CbfD052618",
+      "key": "CHAINLINKPRICEFEED_ADDRESS"
+    },
+    "collateralWhitelist": {
+      "address": "0x65f039D10fb7001d7FD2bAeEaA38e83100E692dB",
+      "key": "COLLATERALWHITELIST_ADDRESS"
+    },
+    "compoundModule": {
+      "address": "0xfFb47CF02e7B04C1BcAb53C95D0Ce92E4b6270E0",
+      "key": "COMPOUNDMODULE_ADDRESS"
+    },
+    "deployer": {
+      "address": "0xac259fdc9F0d29E9D39BdE54dDc890b89422aeE7",
+      "key": "DEPLOYER_ADDRESS"
+    },
+    "factoryVersioning": {
+      "address": "0x505aa6405e6FbFfa146a27B770cee73CC64a1Df7",
+      "key": "FACTORYVERSIONING_ADDRESS"
+    },
+    "finder": {
+      "address": "0x8bd2A9004d9AFA2cb676fBCDC3daAF8D583B9E8E",
+      "key": "FINDER_ADDRESS"
+    },
+    "identifierWhitelist": {
+      "address": "0xcC9B56be1e27FE593ca858e4d89c6bb40D1aaab1",
+      "key": "IDENTIFIERWHITELIST_ADDRESS"
+    },
+    "lendingManager": {
+      "address": "0x094b111a555E85B79E2F0282D0e3930271944dB9",
+      "key": "LENDINGMANAGER_ADDRESS"
+    },
+    "lendingStorageManager": {
+      "address": "0xf4473b2F272df30d85787dE5eF2030a350b16c51",
+      "key": "LENDINGSTORAGEMANAGER_ADDRESS"
+    },
+    "manager": {
+      "address": "0x71921B2F46f705b7b1fCa212A6E2C61de0d484aC",
+      "key": "MANAGER_ADDRESS"
+    },
+    "pool": {
+      "address": "0x1FC13b6A5bdc73Ec6e987c10444f5E016eBc2717",
+      "key": "POOL_ADDRESS"
+    },
+    "poolFactory": {
+      "address": "0x8F54089615e3A11FE2AfBb81b8238CE1417D3Dbd",
+      "key": "POOLFACTORY_ADDRESS"
+    },
+    "poolImplementation": {
+      "address": "0x973eA8d6331126aF6DE7BD4A8Dd48D01d51cB8B3",
+      "key": "POOLIMPLEMENTATION_ADDRESS"
+    },
+    "poolRegistry": {
+      "address": "0x00920C62ee1Bc59Cc6368e5ac7F6fd752185D962",
+      "key": "POOLREGISTRY_ADDRESS"
+    },
+    "priceFeed": {
+      "address": "0x3851F13631011924006f0DcdAF07554dEAA3bfBf",
+      "key": "PRICEFEED_ADDRESS"
+    },
+    "tokenFactory": {
+      "address": "0x9443C2F0fe3284576BBd3100CF10d45821C594C5",
+      "key": "TOKENFACTORY_ADDRESS"
+    },
+    "trustedForwarder": {
+      "address": "0xaAf2D01e47b2dd03e91e5E2422e77e61DA963C58",
+      "key": "TRUSTEDFORWARDER_ADDRESS"
+      },
+    "vaultImplementation": {
+      "address": "0x59CF4bc071dF1Ef8beD5044bbEDAd4fA093C7Edd",
+      "key": "VAULT_IMPLEMENTATION_ADDRESS"
+    },
+    "vaultFactory": {
+      "address": "0xb1A467434144e80E7A92d459AD608BD8b786e529",
+      "key": "VAULT_FACTORY_ADDRESS"
+    },
+    "vaultRegistry": {
+      "address": "0xDa2E55fc79cF1c9180464b6995DFcBe77664BFa9",
+      "key": "VAULT_REGISTRY_ADDRESS"
+    },
+    "vault1x": {
+      "address": "0x6BaDbb1212aC3a3cd0B908Db5De563f055a743F8",
+      "key": "VAULT_1X_ADDRESS"
+    },
+    "vault5x": {
+      "address": "0xCcEd086133efFcd09f6658c17c05b2F17aF2298b",
+      "key": "VAULT_5X_ADDRESS"
+    },
+    "vault20x": {
+      "address": "0xDE0d2c25E54E23468Fc2a65De4b947918181e8A7",
+      "key": "VAULT_20X_ADDRESS"
+    }
+  }
+}
