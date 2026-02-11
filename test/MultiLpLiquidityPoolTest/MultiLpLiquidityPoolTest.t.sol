@@ -25,14 +25,13 @@ import {SynthereumPoolRegistry} from "../../src/registries/PoolRegistry.sol";
 
 import {IERC20} from "lib/forge-std/src/interfaces/IERC20.sol";
 import {ISynthereumMultiLpLiquidityPool} from "../../src/pool/interfaces/IMultiLpLiquidityPool.sol";
-import {ISynthereumMultiLpLiquidityPoolEvents} from "../../src/pool/interfaces/IMultiLpLiquidityPoolEvents.sol";
 import {IStandardERC20} from "../../src/base/interfaces/IStandardERC20.sol";
 import {IMintableBurnableERC20} from "../../src/tokens/interfaces/IMintableBurnableERC20.sol";
 import {CompoundModule} from "../../src/lending-module/lending-modules/Compound.sol";
 
 import {IPoolVault} from "../../src/pool/common/interfaces/IPoolVault.sol";
 
-import {ICompoundToken} from "../../src/interfaces/ICToken.sol";
+import {ICompoundToken, IComptroller} from "../../src/interfaces/ICToken.sol";
 
 import {MultiLpTestHelpers} from "../helpers/MultiLpTestHelpers.sol";
 
@@ -81,13 +80,13 @@ contract MultiLpLiquidityPool_Test is Test {
     uint64 jrtBuybackShare = 0.6 ether;
     uint8 poolVersion;
     uint128 overCollateralRequirement = 0.05 ether;
-    uint64 liquidationReward = 0.5 ether;
+    uint64 liquidationReward = 0.05 ether;  // 5%
     uint64 feePercentage = 0.002 ether; // 0.2% fee
     uint32[2] feeProportions;
     uint256 capMintAmount = 1_000_000 ether;
     uint64 maxSpread = 0.001 ether;
 
-    address debtTokenAddress = 0xC4eF4229FEc74Ccfe17B2bdeF7715fAC740BA0ba; // aave aBnbFdusd debt token
+    address debtTokenAddress = 0xC4eF4229FEc74Ccfe17B2bdeF7715fAC740BA0ba; // Venus FDUSD debt token
     ICompoundToken debtToken = ICompoundToken(debtTokenAddress);
 
     LendingManagerParams lendingManagerParams;
@@ -312,8 +311,37 @@ contract MultiLpLiquidityPool_Test is Test {
             address(deployer)
         );
 
+        // setUpPriceMocks();
+
         vm.stopPrank();
     }
+
+    // function setUpPriceMocks() internal {
+    //     // Mock all price oracle calls for the debt token
+    //     bytes4 getUnderlyingPriceSelector = bytes4(keccak256("getUnderlyingPrice(address)"));
+    //     uint256 mockPrice = 1.14 ether; // 1.14:1 price
+        
+    //     // Mock the main price oracle
+    //     vm.mockCall(
+    //         address(0x90d840f463c4E341e37B1D51b1aB16Bc5b34865C),
+    //         abi.encodeWithSelector(getUnderlyingPriceSelector, debtTokenAddress),
+    //         abi.encode(mockPrice)
+    //     );
+        
+    //     // Mock the comptroller
+    //     vm.mockCall(
+    //         address(0xfD36E2c2a6789Db23113685031d7F16329158384),
+    //         abi.encodeWithSelector(getUnderlyingPriceSelector, debtTokenAddress),
+    //         abi.encode(mockPrice)
+    //     );
+        
+    //     // Mock the risk model
+    //     vm.mockCall(
+    //         address(0x6592b5DE802159F3E74B2486b091D11a8256ab8A),
+    //         abi.encodeWithSelector(getUnderlyingPriceSelector, debtTokenAddress),
+    //         abi.encode(mockPrice)
+    //     );
+    // }
 
     modifier whenTheProtocolWantsToCreateAPool() {
         // it should deploy the pool implementation correctly
@@ -1346,6 +1374,62 @@ contract MultiLpLiquidityPool_Test is Test {
     }
 
     modifier whenLPProfitsOrLossInterestsAreSplit() {
+         //First lp provide liquidity :
+        vm.prank(roles.maintainer);
+        pool.registerLP(lps[0]);
+
+        for (uint8 i = 0; i < lps.length; ++i) {
+            deal(collateralAddress, lps[i], 100 ether);
+        }
+        //First LP provides
+        vm.prank(lps[0]);
+        collateralAmount = 100 ether;
+        CollateralToken.approve(address(pool), 2 * collateralAmount);
+        vm.prank(lps[0]);
+        pool.activateLP(collateralAmount, overCollateralization);
+
+        //Second LP provides
+        vm.prank(roles.maintainer);
+        pool.registerLP(lps[1]);
+
+        vm.prank(lps[1]);
+        collateralAmount = 30 ether;
+        CollateralToken.approve(address(pool), 2 * collateralAmount);
+        vm.prank(lps[1]);
+        pool.activateLP(collateralAmount, overCollateralization);
+
+        //then we mint tokens to update lp position :
+        deal(collateralAddress, roles.randomGuy, 100 ether);
+        vm.prank(roles.randomGuy);
+        CollateralToken.approve(address(pool), 30 ether);
+        mintParams.collateralAmount = 30 ether;
+        vm.prank(roles.randomGuy);
+        pool.mint(mintParams);
+
+        
+
+        //Mock the exchange rate to increase it for 7% APY over 30 days
+        uint256 initialExchangeRate = 1.04 ether;
+        // 7% APY over 30 days = 7% * (30/365) = 0.575% increase
+        
+        // Mock the lending manager's getAccumulatedInterest
+        uint256 poolInterest = 1000 ether;
+        uint256 commissionInterest = 100 ether;
+        uint256 buybackInterest = 100 ether;
+        uint256 totalInterest = poolInterest + commissionInterest + buybackInterest;
+        
+        //Before we check the accumulated interest, we check the pool position
+        pool.positionLPInfo(lps[0]);
+        // vm.mockCall(
+        // address(lendingManager),
+        // abi.encodeWithSelector(ILendingManager.getAccumulatedInterest.selector, pool),
+        // abi.encode(poolInterest, commissionInterest, buybackInterest, 0)
+        // );
+
+        //Then we assume 30 days have passed
+        vm.warp(block.timestamp + 30 days);
+
+
         _;
     }
 
@@ -1354,6 +1438,11 @@ contract MultiLpLiquidityPool_Test is Test {
         whenTheProtocolWantsToCreateAPool
         whenLPProfitsOrLossInterestsAreSplit
     {
+        //Then we check the accumulated interest
+        uint256 poolInterest = MultiLpTestHelpers.updatePositions(address(pool), finder);
+        assertEq(poolInterest, 0);
+        pool.positionLPInfo(lps[0]);
+
         // it should split lending interests correctly
         // it should distribute profits among LPs
         // it should distribute losses among LPs
